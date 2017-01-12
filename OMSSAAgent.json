@@ -1,0 +1,69 @@
+{
+
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+
+  "contentVersion": "1.0.0.0",
+
+  "parameters": {
+
+    "vmList": {
+
+      "type": "string",
+
+      "minLength": 1,
+
+      "metadata": {
+
+        "description": "List of virtual machines to install the agent. If using multiple VMs, make their names comma separate. E.g. VM01,VM02,VM03."
+
+      }
+
+    }
+  },
+
+  "variables": {
+
+
+
+    "vmListArray": "[split(parameters('vmList'),',')]"
+  },
+
+
+  "resources": [
+    {
+
+      "apiVersion": "2015-06-15",
+
+      "type": "Microsoft.Compute/virtualMachines/extensions",
+
+      "name": "[concat(variables('vmListArray')[copyIndex()],'/OMSSMAgent')]",
+
+      "location": "[resourceGroup().location]",
+
+      "copy": {
+
+        "name": "vmExtensionCopy",
+
+        "count": "[length(variables('vmListArray'))]"
+      },
+
+      "properties": {
+        "publisher": "Microsoft.Compute",
+
+        "type": "CustomScriptExtension",
+
+        "typeHandlerVersion": "1.7",
+
+        "autoUpgradeMinorVersion": true,
+
+        "settings": {
+          "fileUris": [
+            "https://myqfilestorage.blob.core.windows.net/scripts/OMSServiceMapInstall.ps1"
+          ],
+          "commandToExecute": "powershell.exe -ExecutionPolicy Unrestricted -File OMSServiceMapInstall.ps1"
+
+        }
+      }
+    }
+  ]
+}
