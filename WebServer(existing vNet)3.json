@@ -1,0 +1,275 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "adminPassword": {
+
+      "type": "securestring",
+
+      "metadata": {
+
+        "description": "Password for the Virtual Machine."
+      }
+    },
+    "vmName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the VM"
+      }
+    },
+    "privateIPAddress" : {
+        "type": "string",
+        "metadata": {
+            "description": "Static private IP"
+        }
+    },
+
+    "windowsOSVersion": {
+
+      "type": "string",
+
+      "defaultValue": "2012-R2-Datacenter",
+
+      "allowedValues": [
+
+        "2008-R2-SP1",
+
+        "2012-Datacenter",
+
+        "2012-R2-Datacenter"
+
+      ],
+
+      "metadata": {
+
+        "description": "The Windows version for the VM. This will pick a fully patched image of this given Windows version. Allowed values: 2008-R2-SP1, 2012-Datacenter, 2012-R2-Datacenter."
+
+      }
+
+    
+      },
+    "storageAccountName":{
+
+      "type": "string",
+      "metadata": {
+        "description": "Name of the VM storage account"
+      }
+
+    },
+    "vmSize": {
+      "type": "string",
+      "defaultValue": "Standard_DS1_v2",
+      "allowedValues": [
+        "Standard_DS1_v2",
+        "Standard_DS2_v2",
+        "Standard_DS3_v2",
+        "Standard_DS4_v2",
+        "Standard_DS5_v2",
+        "Standard_DS11_v2",
+        "Standard_DS12_v2",
+        "Standard_DS13_v2",
+        "Standard_DS14_v2",
+        "Standard_DS15_v2"
+      ],
+      "metadata": {
+
+        "description": "The size of the VM you want to create"
+      }
+    }
+    },
+
+    "variables": {
+      "apiversion": "2015-06-15",
+
+
+
+
+
+      "adminUsername": "MyQ-PP",
+      "existingVirtualNetworkResourceGroup": "MyQ-PP-RG",
+      "existingVirtualNetworkName": "Pre-Production",
+      "subnetName": "MyQ-PP",
+      "networkSecurityGroupName": "MyQ-PP-WEB-NSG",
+      "storageAccountType": "Premium_LRS",
+      "location": "North Central US",
+      "dataDiskSize": 128,
+
+
+
+      "availabilitySetName": "Web-AvailSet",
+      "diagnosticsStorageAccountName": "myqppwebdiag",
+      "dnsNameForPublicIP": "[concat(parameters('vmName'),'-pip')]",
+      "publicIPAddressType": "Dynamic",
+      "vnetID": "[resourceId(variables('existingVirtualNetworkResourceGroup'), 'Microsoft.Network/virtualNetworks', variables('existingVirtualNetworkName'))]",
+      "subnetRef": "[concat(variables('vnetID'),'/subnets/', variables('subnetName'))]",
+      "nicName": "[parameters('vmName')]",
+      "publicIPAddressName": "[concat(parameters('vmName'),'-pip')]"
+
+    },
+    "resources": [
+      {
+        "apiVersion": "2015-06-15",
+        "type": "Microsoft.Network/publicIPAddresses",
+        "name": "[variables('publicIPAddressName')]",
+        "location": "[resourceGroup().location]",
+        "tags": {
+          "displayName": "PublicIPAddress"
+        },
+        "properties": {
+          "publicIPAllocationMethod": "[variables('publicIPAddressType')]"         
+        }
+      },
+      {
+        "apiVersion": "2015-06-15",
+        "type": "Microsoft.Network/networkInterfaces",
+        "name": "[variables('nicName')]",
+        "location": "[resourceGroup().location]",
+        "dependsOn": [
+          "[concat('Microsoft.Network/publicIPAddresses/', variables('publicIPAddressName'))]"
+        ],
+        "tags": {
+          "displayName": "NetworkInterface"
+        },
+        "properties": {
+          "ipConfigurations": [
+            {
+              "name": "ipconfig1",
+              "properties": {
+                "privateIPAddress": "[parameters('privateIPAddress')]",
+                "privateIPAllocationMethod": "Static",
+                "privateIPAddressVersion": "IPv4",
+                "publicIPAddress": {
+                  "id": "[resourceId('Microsoft.Network/publicIPAddresses',variables('publicIPAddressName'))]"
+                },
+                "subnet": {
+                  "id": "[variables('subnetRef')]"
+                }
+              }
+            }
+          ],
+          "networkSecurityGroup": {
+                    "id": "[resourceId('MyQ-PP-WEB-RG', 'Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
+                }
+        }
+      },
+      {
+        "apiVersion": "2015-06-15",
+        "type": "Microsoft.Compute/virtualMachines",
+        "name": "[parameters('vmName')]",
+        "location": "[resourceGroup().location]",
+        "tags": {
+          "displayName": "VirtualMachine"
+        },
+        "dependsOn": [
+          "[concat('Microsoft.Network/networkInterfaces/', variables('nicName'))]",
+          "[concat('Microsoft.Storage/storageAccounts/', parameters('storageAccountName'))]"
+        ],
+        "properties": {
+          "osProfile": {
+            "computerName": "[parameters('vmName')]",
+            "adminUsername": "[variables('adminUsername')]",
+            "adminPassword": "[parameters('adminPassword')]",
+            "windowsConfiguration": {
+              "provisionVmAgent": "true"
+            }
+          },
+          "hardwareProfile": {
+            "vmSize": "[parameters('vmSize')]"
+          },
+          "storageProfile": {
+            "imageReference": {
+              "publisher": "MicrosoftWindowsServer",
+              "offer": "WindowsServer",
+              "sku": "[parameters('windowsOSVersion')]",
+              "version": "latest"
+            },
+             "dataDisks": [
+
+            {
+
+              "name": "[concat(parameters('vmName'), '-DATA')]",
+
+              "diskSizeGB": "[variables('dataDiskSize')]",
+
+              "lun": 0,
+
+              "vhd": {
+
+                "uri": "[concat(concat(reference(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2015-06-15').primaryEndpoints['blob'], 'vhds/'), parameters('vmName'), '-DATA', '.vhd')]"
+
+              },
+
+              "createOption": "Empty"
+
+            }
+             ],
+            "osDisk": {
+              "name": "[concat(parameters('vmName'), '-OS')]",
+              "caching": "ReadWrite",
+              "vhd": {
+                "uri": "[concat(concat(reference(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2015-06-15').primaryEndpoints['blob'], 'vhds/'), parameters('vmName'), '.vhd')]"
+              },
+              "createOption": "FromImage"
+            }
+          },
+          "networkProfile": {
+            "networkInterfaces": [
+              {
+                "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('nicName'))]"
+              }
+            ]
+          },
+          "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true,
+                        "storageUri": "[reference(resourceId('MyQ-PP-WEB-RG', 'Microsoft.Storage/storageAccounts', variables('diagnosticsStorageAccountName')), '2015-06-15').primaryEndpoints['blob']]"
+                    }
+            },
+            "availabilitySet": {
+                    "id": "[resourceId('Microsoft.Compute/availabilitySets', variables('availabilitySetName'))]"
+                }
+        }       
+      },
+      {
+
+            "apiVersion": "2015-06-15",
+
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+
+            "name": "[concat(parameters('vmName'),'/webDataDiskInit')]",
+
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+"[concat('Microsoft.Compute/virtualMachines/', parameters('vmName'))]"           
+ ],
+
+       "properties": {
+       "publisher": "Microsoft.Compute",
+
+                "type": "CustomScriptExtension",
+
+                "typeHandlerVersion": "1.7",
+
+                "autoUpgradeMinorVersion": true,
+
+                "settings": {
+                    "fileUris": [
+           "https://myqfilestorage.blob.core.windows.net/scripts/Web-FormatDataDisk.ps1"
+       ],
+"commandToExecute": "powershell.exe -ExecutionPolicy Unrestricted -File Web-FormatDataDisk.ps1"
+                
+   }
+ }
+         },
+      {
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[parameters('storageAccountName')]",
+            "apiVersion": "2015-06-15",
+            "location": "[variables('location')]",
+            "properties": {
+                "accountType": "[variables('storageAccountType')]"
+            }
+        }
+      
+    ]
+  }
