@@ -6,10 +6,10 @@ $Credential=New-Object -TypeName System.Management.Automation.PSCredential `
  -ArgumentList $User, (Get-Content $File | ConvertTo-SecureString)
 
 
-$CustomerId = "20c35212-62bb-4331-9c79-298d750c2c8f"  
+$CustomerId = " "  
 
 # Replace with your Primary Key
-$SharedKey = "VDCVRSyErB4XrwsBr5jmuVLrIL+HbKTH/gcy3vqE+f7fztWosjRLe5HQPlaL/RxHZHfhil8EAOvhwQN9M8Q+lw=="
+$SharedKey = " "
 
 # Specify the name of the record type that you'll be creating
 $LogType = "RabbitQueue"
